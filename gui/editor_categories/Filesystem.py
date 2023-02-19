@@ -1,9 +1,11 @@
 import logging
 import os.path
 import struct
+import tkinter as tk
 from typing import List, Tuple, Callable, Any, Union
 
 from PySide6 import QtCore, QtWidgets, QtGui
+from ..editor_categories.Hexadecimal import MainWindow
 from formats.filesystem import Folder, PlzArchive, NintendoDSRom, CompressedIOWrapper
 from ..EditorTypes import EditorCategory, EditorObject
 from ..ui.MainEditor import MainEditorUI
@@ -226,7 +228,8 @@ class FilesystemCategory(EditorCategory):
         if isinstance(index.internalPointer(), AssetNode):
             return [
                 ("Replace raw data", lambda: self.import_(index, refresh_function)),
-                ("Export raw data", lambda: self.export(index))
+                ("Export raw data", lambda: self.export(index)),
+                ("View as hex", lambda: self.openHexEditor(index))
             ]
         return []
 
@@ -259,6 +262,25 @@ class FilesystemCategory(EditorCategory):
                 asset_file = CompressedIOWrapper(asset_file, asset_compression == 2)
             export_file.write(asset_file.read())
             asset_file.close()
+
+    def openHexEditor(self, index: QtCore.QModelIndex):
+        asset: AssetNode = index.internalPointer()
+        export_path = os.getcwd() + "\\temporary\\temp.hex"
+        if export_path == "":
+            return
+        with open(export_path, "wb") as export_file:
+            asset_file = asset.rom.open(asset.path, "rb")
+            asset_compression = asset.get_asset_compression()
+            if asset_compression != 0:
+                asset_file = CompressedIOWrapper(asset_file, asset_compression == 2)
+            export_file.write(asset_file.read())
+            asset_file.close()
+        app = tk.Tk()
+        app.title("Hex View")
+        mw = MainWindow(app)
+        app.protocol("WM_DELETE_WINDOW", mw.quit)
+        app.resizable(width=False, height=False)
+        app.mainloop()
 
     def flags(self, index: QtCore.QModelIndex, model: QtCore.QAbstractItemModel) -> QtCore.Qt.ItemFlag:
         default_flags = super(FilesystemCategory, self).flags(index, model)
